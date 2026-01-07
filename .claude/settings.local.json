@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(node test-setup.js)",
+      "Bash(npm run server)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill /F /PID 20540)",
+      "Bash(taskkill //F //PID 20540)",
+      "Bash(taskkill //F //PID 11808)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
