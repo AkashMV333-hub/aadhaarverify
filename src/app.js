@@ -251,7 +251,7 @@ app.get('/', (req, res) => {
       </script>
     </body>
     </html>
-  \`);
+  `);
 });
 
 // Verify endpoint
@@ -268,18 +268,11 @@ app.post('/verify', upload.single('file'), async (req, res) => {
 
     const uploadedExt = path.extname(req.file.originalname).toLowerCase();
 
-    // Get file buffer (from memory or disk)
-    let fileBuffer;
-    if (req.file.buffer) {
-      fileBuffer = req.file.buffer;
-    } else {
-      fileBuffer = fs.readFileSync(req.file.path);
-    }
-
     if (uploadedExt === '.zip') {
       const password = req.body.password || '';
 
       try {
+        const fileBuffer = fs.readFileSync(req.file.path);
         const blob = new Blob([fileBuffer]);
 
         const reader = new zipjs.ZipReader(new zipjs.BlobReader(blob), { password });
@@ -288,6 +281,7 @@ app.post('/verify', upload.single('file'), async (req, res) => {
 
         if (!xmlEntry) {
           await reader.close();
+          try { fs.unlinkSync(req.file.path); } catch (e) {}
           return res.status(400).json({
             valid: false,
             verified: false,
@@ -299,9 +293,12 @@ app.post('/verify', upload.single('file'), async (req, res) => {
         const xmlText = await xmlEntry.getData(new zipjs.TextWriter());
         await reader.close();
 
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+
         const result = await verifier.verify(xmlText);
         return res.json(result);
       } catch (zipErr) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
         console.error('ZIP extraction error (zip.js):', zipErr);
 
         const errMsg = zipErr && zipErr.message ? zipErr.message.toLowerCase() : '';
@@ -322,14 +319,8 @@ app.post('/verify', upload.single('file'), async (req, res) => {
         });
       }
     } else {
-      const xmlText = fileBuffer.toString('utf8');
-      const result = await verifier.verify(xmlText);
-
-      // Cleanup disk file if it exists (only in local mode)
-      if (!isServerless && req.file.path) {
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-      }
-
+      const result = await verifier.verifyFile(req.file.path);
+      try { fs.unlinkSync(req.file.path); } catch (cleanupError) { console.error('Failed to delete temporary file:', cleanupError); }
       return res.json(result);
     }
 
